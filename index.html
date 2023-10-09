@@ -60,7 +60,7 @@
             PosX = (ostX1 <= 20 ? PosX - ostX1 : (ostX2 <= 20 ? PosX + ostX2 : PosX));
             PosY = (ostY1 <= 20 ? PosY - ostY1 : (ostY2 <= 20 ? PosY + ostY2 : PosY));
             
-            if(PosX % CellSize == 0 && PosY % CellSize == 0 && !isDot[PosX / CellSize][PosY / CellSize]){
+            if(PosX % CellSize == 0 && PosY % CellSize == 0 && isDot[PosX / CellSize][PosY / CellSize] == undefined){
 
                 isDot[PosX / CellSize][PosY / CellSize] = color[turn];
                 Dots[color[turn]].push([PosX / CellSize, PosY / CellSize]);
@@ -151,36 +151,35 @@
                 miniy = Math.min(miniy, v[1]);
                 maxiy = Math.max(maxiy, v[1]);
             });
-            coordenemy = [-1, -1];
+            
             let enemies = [];
-            let left = false, enemy = false, right = false, good = false;
             for(let i = miniy; i <= maxiy; i++){
-                left = false, enemy = false, right = false;
+                let left = -1, enemy = false, right = -1;
                 for(let j = minix; j <= maxix; j++){
-                    if(left && enemy && isDot[j][i] == color){
-                        right = true;   
-                        good = true;
+                    if(isDot[j][i] == color){
+                        left = j;   
+                        break;
                     }
-                    else if(isDot[j][i] == color){
-                        left = true;
-                    }
-                    else if(left && isDot[j][i] != undefined){
-                        enemy = true;
-                        coordenemy = [j, i];
-                        enemies.push(coordenemy);
-                    }
-
-                    if(left && right && enemies.length >= 1){
-                        enemies.forEach(enemy =>{
-                            isDot[enemy[0]][enemy[1]] = undefined;
-                        });
-                        enemies = [];
-                    }
-
-
                 }
+                for(let j = maxix; j >= minix; j--){
+                    if(isDot[j][i] == color){
+                        right = j;   
+                        break;
+                    }
+                }
+                for(let j = left; j <= right; j++){
+                    if(isDot[j][i] == (color == 'red' ? 'blue' : 'red')){
+                        enemies.push([j, i]);
+                    }
+                }
+
             }
-            if(good){
+            if(enemies.length > 0){
+
+                enemies.forEach(enemy =>{
+                    isDot[enemy[0]][enemy[1]] = '.';
+                });
+
                 ctx.beginPath();
                 ctx.lineWidth = 5;
                 ctx.moveTo(cycle[0][0] * CellSize, cycle[0][1] * CellSize);
@@ -190,6 +189,7 @@
                     ctx.fill();
                 }
                 ctx.stroke();
+
             }
             
         }
