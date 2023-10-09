@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="turn"></header>
+
+    <canvas id="canvas" ></canvas>
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d"); 
+        canvas.width = 2000;
+        canvas.height = 2000;
+        var CellSize = 50;
+        var numberofCells = Math.floor(canvas.width / CellSize);
+        canvas.width = CellSize * numberofCells + 2;
+        canvas.height = canvas.width;
+
+        window.addEventListener("load", drawGrid);
+        var PosX = 0, PosY = 0;
+
+        canvas.addEventListener("mousemove", ()=>{
+            PosX = event.offsetX;
+            PosY = event.offsetY;
+        });
+
+        var color = ["red", "blue"];
+        var turn = 0;
+
+        var isDot = new Array(numberofCells);
+        for(let i = 0; i < numberofCells; i++){
+            isDot[i] = new Array(numberofCells);
+        }
+
+        var Dots = {
+            "red": [],
+            "blue": []
+        };
+
+        var header_text = ["Ход Красного", "Ход Синего"];
+        var header_color = ["red", "blue"];
+
+
+        document.getElementById("turn").innerHTML = header_text[turn];
+        document.getElementById("turn").classList.add(header_color[turn]);
+
+        
+        canvas.addEventListener("mousedown", ()=>{
+            let ostX1 = PosX % CellSize;
+            let ostX2 = CellSize - ostX1;
+            let ostY1 = PosY % CellSize;
+            let ostY2 = CellSize - ostY1;
+            PosX = (ostX1 <= 20 ? PosX - ostX1 : (ostX2 <= 20 ? PosX + ostX2 : PosX));
+            PosY = (ostY1 <= 20 ? PosY - ostY1 : (ostY2 <= 20 ? PosY + ostY2 : PosY));
+            
+            if(PosX % CellSize == 0 && PosY % CellSize == 0 && !isDot[PosX / CellSize][PosY / CellSize]){
+
+                isDot[PosX / CellSize][PosY / CellSize] = color[turn];
+                Dots[color[turn]].push([PosX / CellSize, PosY / CellSize]);
+
+                ctx.beginPath();
+                    ctx.arc(PosX, PosY, 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = color[turn];
+                    
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = color[turn];
+                    
+                ctx.stroke();
+                ctx.fill();
+                let used = new Array(Dots[color[turn]].length);
+                let p = new Array(Dots[color[turn]].length);
+                let cycle_end = -1;
+			    let cycle_st = [PosX / CellSize, PosY / CellSize];
+                let cycle = [];
+
+                Dots[color[turn]].forEach(Dot => {
+                     used[Dot] = 0;
+                     p[Dot] = [-1, -1];
+                });
+                FindCycle(cycle_st, Dots, used, color[turn], p, cycle_st, cycle_end);
+
+                turn ^= true;
+
+                document.getElementById("turn").innerHTML = header_text[turn];
+                document.getElementById("turn").removeAttribute("class");
+                document.getElementById("turn").classList.add(header_color[turn]);
+
+            }
+        });
+
+        function good(x, y){
+            return (x > 0 && y > 0 && x < numberofCells && y < numberofCells);
+        }
+
+        function FindCycle(v, Dots, used, color, p, cycle_st, cycle_end){
+
+            used[v] = 1;
+
+            for(let i = -1; i <= 1; i++){
+                for(let j = -1; j <= 1; j++){
+                    if(i == 0 && j == 0){
+                        continue;
+                    }
+                    let newx = v[0] + i;
+                    let newy = v[1] + j;
+
+                    if(good(newx, newy)){
+                        
+                        if(isDot[newx][newy] == color){
+
+                            //console.log(newx, newy, isDot[newx][newy], used[[newx, newy]]);
+
+                            if(used[[newx, newy]] == 0){
+                                p[[newx, newy]] = v;
+                                FindCycle([newx, newy], Dots, used, color, p, cycle_st, cycle_end);
+                            }
+
+                            else if(newx == cycle_st[0] && newy == cycle_st[1] && (p[v][0] != newx || p[v][1] != newy)){
+                                cycle_end = v;
+                                let cycle = [];
+                                for (let v = cycle_end; (v[0] != cycle_st[0] || v[1] != cycle_st[1])  ; v = p[v]){
+                                    cycle.push(v);
+                                }
+
+                                cycle.push(cycle_st);
+                        
+                                check_cycle(cycle, color);
+                            }
+                            
+                        }
+
+                    }
+                }
+            }
+        }
+
+        function check_cycle(cycle, color){
+            
+            let minix = 1e9, maxix = -1e9, miniy = 1e9, maxiy = -1e9;
+            
+            cycle.forEach(v =>{
+                minix = Math.min(minix, v[0]);
+                maxix = Math.max(maxix, v[0]);
+                miniy = Math.min(miniy, v[1]);
+                maxiy = Math.max(maxiy, v[1]);
+            });
+            coordenemy = [-1, -1];
+            let enemies = [];
+            let left = false, enemy = false, right = false, good = false;
+            for(let i = miniy; i <= maxiy; i++){
+                left = false, enemy = false, right = false;
+                for(let j = minix; j <= maxix; j++){
+                    if(left && enemy && isDot[j][i] == color){
+                        right = true;   
+                        good = true;
+                    }
+                    else if(isDot[j][i] == color){
+                        left = true;
+                    }
+                    else if(left && isDot[j][i] != undefined){
+                        enemy = true;
+                        coordenemy = [j, i];
+                        enemies.push(coordenemy);
+                    }
+
+                    if(left && right && enemies.length >= 1){
+                        enemies.forEach(enemy =>{
+                            isDot[enemy[0]][enemy[1]] = undefined;
+                        });
+                        enemies = [];
+                    }
+
+
+                }
+            }
+            if(good){
+                ctx.beginPath();
+                ctx.lineWidth = 5;
+                ctx.moveTo(cycle[0][0] * CellSize, cycle[0][1] * CellSize);
+
+                for(let i = 1; i < cycle.length; i++){    
+                    ctx.lineTo(cycle[i][0] * CellSize, cycle[i][1] * CellSize );
+                    ctx.fill();
+                }
+                ctx.stroke();
+            }
+            
+        }
+
+        function drawGrid(){
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = "1";
+            for(let i = 0; i < canvas.height; i+= CellSize){
+                ctx.beginPath()
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+            for(let i = 0; i < canvas.width; i+= CellSize){
+                ctx.beginPath()
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+        }
+
+    </script>
+</body>
+</html>
