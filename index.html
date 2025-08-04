@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header id="turn"></header>
     <div id="wrapper">
         <canvas id="canvas" ></canvas>
     </div>
@@ -44,12 +43,8 @@
             "blue": []
         };
 
-        var header_text = ["Ход Красного", "Ход Синего"];
+
         var header_color = ["red", "blue"];
-
-
-        document.getElementById("turn").innerHTML = header_text[turn];
-        document.getElementById("turn").classList.add(header_color[turn]);
 
         
         canvas.addEventListener("mousedown", ()=>{
@@ -88,12 +83,11 @@
 
                 turn ^= true;
 
-                document.getElementById("turn").innerHTML = header_text[turn];
-                document.getElementById("turn").removeAttribute("class");
-                document.getElementById("turn").classList.add(header_color[turn]);
-
             }
         });
+
+
+        var Directions = [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, -1], [-1, 1], [1, -1]];
 
         function good(x, y){
             return (x > 0 && y > 0 && x < numberofCells && y < numberofCells);
@@ -102,20 +96,14 @@
         function FindCycle(v, Dots, used, color, p, cycle_st, cycle_end){
 
             used[v] = 1;
+            Directions.forEach(dir =>{
 
-            for(let i = -1; i <= 1; i++){
-                for(let j = -1; j <= 1; j++){
-                    if(i == 0 && j == 0){
-                        continue;
-                    }
-                    let newx = v[0] + i;
-                    let newy = v[1] + j;
+                let newx = v[0] + dir[0];
+                    let newy = v[1] + dir[1];
 
                     if(good(newx, newy)){
                         
                         if(isDot[newx][newy] == color){
-
-                            //console.log(newx, newy, isDot[newx][newy], used[[newx, newy]]);
 
                             if(used[[newx, newy]] == 0){
                                 p[[newx, newy]] = v;
@@ -137,62 +125,95 @@
                         }
 
                     }
-                }
+
+            });
+
+        }
+
+
+        function IsDotInCycle(x, y, cycle){
+
+            x *= CellSize;
+            y *= CellSize;
+            let in_polygon = false;
+
+            for(let i = 1; i <= cycle.length; i++){
+                xp = cycle[i % cycle.length][0] * CellSize;
+                yp = cycle[i % cycle.length][1] * CellSize;
+                xp_prev = cycle[(i-1) % cycle.length][0] * CellSize;
+                yp_prev = cycle[(i-1) % cycle.length][1] * CellSize;
+                if (((yp <= y && y < yp_prev) || (yp_prev <= y && y < yp)) && (x > (xp_prev - xp) * (y - yp) / (yp_prev - yp) + xp)) {
+                    in_polygon = !in_polygon;
+                }       
             }
+
+            return in_polygon;
+
         }
 
         function check_cycle(cycle, color){
             
+            enemy = (color == 'red' ? 'blue' : 'red');
+            let enemies = [];
+
+            let x, y, xp, yp, xp_prev, yp_prev;
+            let find = false;
+            for(let i = 0; i < Dots[enemy].length; i++){
+                let e_dot = Dots[enemy][i];
+                if(IsDotInCycle(e_dot[0], e_dot[1], cycle)){
+                    find = true;
+                    break;
+                }
+            }
+
+
+            if(!find){
+                return;
+            }
+
+            ctx.beginPath();
+            ctx.lineWidth = 5;
+            ctx.moveTo(cycle[0][0] * CellSize, cycle[0][1] * CellSize);
+
+            for(let i = 1; i < cycle.length; i++){    
+                ctx.lineTo(cycle[i][0] * CellSize, cycle[i][1] * CellSize );
+                
+            }
+
+            ctx.lineTo(cycle[0][0] * CellSize, cycle[0][1] * CellSize );
+            ctx.stroke();
+            ctx.fill();
+
             let minix = 1e9, maxix = -1e9, miniy = 1e9, maxiy = -1e9;
-            
             cycle.forEach(v =>{
                 minix = Math.min(minix, v[0]);
                 maxix = Math.max(maxix, v[0]);
                 miniy = Math.min(miniy, v[1]);
                 maxiy = Math.max(maxiy, v[1]);
             });
-            
-            let enemies = [];
+
             for(let i = miniy; i <= maxiy; i++){
-                let left = -1, enemy = false, right = -1;
+
                 for(let j = minix; j <= maxix; j++){
-                    if(isDot[j][i] == color){
-                        left = j;   
-                        break;
-                    }
-                }
-                for(let j = maxix; j >= minix; j--){
-                    if(isDot[j][i] == color){
-                        right = j;   
-                        break;
-                    }
-                }
-                for(let j = left; j <= right; j++){
-                    if(isDot[j][i] == (color == 'red' ? 'blue' : 'red')){
-                        enemies.push([j, i]);
-                    }
-                }
+                    if(IsDotInCycle(j, i, cycle) && isDot[j][i] != color ){
 
+                        if(isDot[i][j] == enemy){
+                            
+                            let index = Dots[enemy].indexOf([i, j]);
+                            if (index !== -1) {
+                                Dots[enemy].splice(index, 1);
+                            }
+                        }
+
+                        isDot[j][i] = 'not available';
+                        
+                    }
+                }
             }
-            if(enemies.length > 0){
 
-                enemies.forEach(enemy =>{
-                    isDot[enemy[0]][enemy[1]] = '.';
-                });
-
-                ctx.beginPath();
-                ctx.lineWidth = 5;
-                ctx.moveTo(cycle[0][0] * CellSize, cycle[0][1] * CellSize);
-
-                for(let i = 1; i < cycle.length; i++){    
-                    ctx.lineTo(cycle[i][0] * CellSize, cycle[i][1] * CellSize );
-                    ctx.fill();
-                }
-                ctx.stroke();
-
-            }
-            
         }
+
+
 
         function drawGrid(){
             ctx.clearRect(0,0, canvas.width, canvas.height);
